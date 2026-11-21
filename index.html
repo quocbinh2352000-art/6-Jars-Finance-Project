@@ -1,0 +1,2553 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#090d16">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="application-name" content="6 Hũ Tài Chính">
+    <title>6 Hũ Tài Chính - Mobile App</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tải phông chữ Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tải biểu tượng Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tải Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #05080f;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+            user-select: none;
+        }
+        input, select {
+            user-select: text;
+        }
+        /* Vùng an toàn cho tai thỏ / thanh điều hướng điện thoại */
+        .safe-top {
+            padding-top: max(1rem, env(safe-area-inset-top));
+        }
+        .safe-bottom {
+            padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+        }
+        @keyframes slideUpModal {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .modal-sheet {
+            animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .modal-backdrop {
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+        /* Ẩn thanh cuộn nhưng vẫn cho phép cuộn mượt */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-[#05080f] text-slate-100 flex justify-center">
+
+    <!-- Khung Mobile App Container (Căn giữa trên màn hình lớn, tràn viền trên điện thoại) -->
+    <div class="w-full max-w-md min-h-screen bg-[#090d16] sm:border-x sm:border-slate-800/80 flex flex-col relative shadow-2xl overflow-x-hidden">
+        
+        <!-- Mobile App Top Bar -->
+        <header class="sticky top-0 z-30 bg-[#090d16]/90 backdrop-blur-xl border-b border-slate-800/70 px-4 pb-3 safe-top flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-slate-950 shadow-lg shadow-emerald-500/20">
+                    <i data-lucide="wallet" class="w-5 h-5 stroke-[2.5]"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-white leading-tight">6 Hũ Tài Chính</h1>
+                    <p class="text-[11px] text-emerald-400 font-medium">Hệ thống JARS</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <!-- Nút Đăng nhập Google / Trạng thái đồng bộ Cloud -->
+                <button type="button" id="cloud-auth-btn" class="text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl font-semibold active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer" title="Đăng nhập Google để đồng bộ đám mây">
+                    <i data-lucide="cloud" id="cloud-status-icon" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span id="cloud-auth-label">Đồng bộ</span>
+                </button>
+                <button id="install-pwa-btn" class="hidden text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl font-semibold active:scale-95 transition-all flex items-center gap-1 cursor-pointer">
+                    <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                    <span>Cài App</span>
+                </button>
+                <button id="reset-demo-btn" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 active:scale-95 transition-all cursor-pointer" title="Khôi phục dữ liệu mẫu">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Thanh trạng thái tài khoản & đồng bộ Cloud -->
+        <div id="cloud-account-bar" class="hidden bg-amber-950/30 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between gap-2 text-[11px]">
+            <div class="flex items-center gap-2 min-w-0">
+                <img id="cloud-user-avatar" src="" alt="Avatar" class="w-5 h-5 rounded-full border border-amber-400/40 shrink-0 hidden" onerror="this.classList.add('hidden')">
+                <div class="min-w-0">
+                    <span id="cloud-user-name" class="font-bold text-amber-300 block truncate">Tài khoản đồng bộ</span>
+                    <span id="cloud-sync-status" class="text-[10px] text-slate-400 block truncate">Đang kết nối máy chủ đám mây...</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button" id="cloud-google-signin-btn" class="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold active:scale-95 cursor-pointer flex items-center gap-1" title="Liên kết tài khoản Google">
+                    <i data-lucide="log-in" class="w-3 h-3"></i>
+                    <span>Google</span>
+                </button>
+                <button type="button" id="cloud-sync-now-btn" class="px-2 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold active:scale-95 cursor-pointer flex items-center gap-1" title="Đẩy dữ liệu lên đám mây ngay">
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                    <span>Lưu</span>
+                </button>
+                <button type="button" id="cloud-signout-btn" class="hidden px-2 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 font-semibold active:scale-95 cursor-pointer" title="Đăng xuất Google">
+                    Thoát
+                </button>
+            </div>
+        </div>
+
+        <!-- Vùng nội dung chính cuộn dọc (Có khoảng trống dưới cho Bottom Nav) -->
+        <main class="flex-1 px-4 pt-4 pb-28 space-y-5 overflow-y-auto no-scrollbar">
+
+            <!-- TAB 1: TỔNG QUAN & 6 HŨ (HOME) -->
+            <div id="tab-home" class="space-y-5">
+                
+                <!-- Thẻ Số Dư Chính (Bank Card Style) -->
+                <div class="bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-5 rounded-3xl shadow-xl border border-emerald-400/20 relative overflow-hidden">
+                    <div class="absolute -right-10 -top-10 w-36 h-36 bg-white/10 rounded-full blur-2xl"></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-emerald-100/80 text-xs font-medium uppercase tracking-wider">Tổng số dư hiện tại</span>
+                        <span class="px-2 py-0.5 rounded-full bg-black/25 text-[10px] font-semibold text-emerald-200 backdrop-blur-sm">6 Hũ Hoạt Động</span>
+                    </div>
+                    <div id="balance-amount" class="text-3xl font-extrabold text-white tracking-tight mt-1.5">0 ₫</div>
+                    
+                    <!-- Thu / Chi nhanh -->
+                    <div class="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-white/15">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center text-emerald-200 shrink-0">
+                                <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-[10px] text-emerald-100/75">Tổng thu</p>
+                                <p id="income-amount" class="text-xs font-bold text-white truncate">+0 ₫</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-rose-500/25 flex items-center justify-center text-rose-200 shrink-0">
+                                <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-[10px] text-emerald-100/75">Tổng chi</p>
+                                <p id="expense-amount" class="text-xs font-bold text-rose-200 truncate">-0 ₫</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Danh sách 6 Hũ Tài Chính (2 cột tối ưu cho màn hình Mobile) -->
+                <section class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+                            <i data-lucide="piggy-bank" class="w-4 h-4 text-amber-400"></i>
+                            <span>6 Hũ Tài Chính</span>
+                        </h2>
+                        <span class="text-[11px] text-slate-400">Chạm hũ để chi nhanh</span>
+                    </div>
+                    
+                    <div id="jars-container" class="grid grid-cols-2 gap-3">
+                        <!-- 6 Thẻ hũ sẽ được render tại đây -->
+                    </div>
+                </section>
+
+                <!-- Giao dịch gần đây (Tóm tắt 3 giao dịch mới nhất) -->
+                <section class="space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-sm font-bold text-white">Gần đây</h2>
+                        <button type="button" onclick="switchTab('history')" class="text-xs font-semibold text-emerald-400 active:opacity-70 cursor-pointer">
+                            Xem tất cả
+                        </button>
+                    </div>
+                    <ul id="recent-transaction-list" class="space-y-2.5">
+                        <!-- 3 giao dịch gần nhất -->
+                    </ul>
+                </section>
+            </div>
+
+            <!-- TAB 2: LỊCH SỬ GIAO DỊCH & CHU KỲ (HISTORY) -->
+            <div id="tab-history" class="hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Lịch Sử Giao Dịch</h2>
+                        <p class="text-xs text-slate-400">Quản lý theo chu kỳ lương & năm (chốt 31/12)</p>
+                    </div>
+                    <span id="transaction-count" class="text-xs font-semibold text-slate-400 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full">0 giao dịch</span>
+                </div>
+
+                <!-- 2 trang nhỏ trong Tab Lịch Sử: Chu kỳ nhỏ & Theo năm -->
+                <div class="grid grid-cols-2 gap-2 p-1 bg-slate-900 rounded-2xl border border-slate-800">
+                    <button type="button" id="subtab-cycle-btn" class="py-2 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5">
+                        <i data-lucide="calendar-range" class="w-3.5 h-3.5"></i>
+                        <span>Chu kỳ nhỏ</span>
+                    </button>
+                    <button type="button" id="subtab-year-btn" class="py-2 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center gap-1.5">
+                        <i data-lucide="calendar-days" class="w-3.5 h-3.5"></i>
+                        <span>Theo năm</span>
+                    </button>
+                </div>
+
+                <!-- TRANG NHỎ 1: QUẢN LÝ THEO CHU KỲ NHỎ (CHỐT SỔ THỦ CÔNG) -->
+                <div id="history-subtab-cycle" class="space-y-4">
+                    <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 space-y-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="min-w-0">
+                                <span id="current-cycle-title" class="text-xs font-bold text-emerald-400 block truncate">Chu kỳ lương #1</span>
+                                <span id="current-cycle-range" class="text-[11px] text-slate-400 block truncate">Mở đầu 2026-11-01 • Kết thúc (chốt sổ) 2026-11-25</span>
+                            </div>
+                            <button type="button" id="close-cycle-btn" class="px-3 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs active:scale-95 transition-all shrink-0 cursor-pointer flex items-center gap-1">
+                                <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+                                <span>Chốt sổ</span>
+                            </button>
+                        </div>
+
+                        <!-- Chọn ngày chốt sổ chu kỳ tháng thủ công bằng trang lịch nhỏ -->
+                        <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2 relative">
+                            <span class="text-[11px] text-slate-300 font-medium flex items-center gap-1.5">
+                                <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+                                <span>Ngày chốt sổ kỳ này:</span>
+                            </span>
+                            <button type="button" id="cycle-close-date-btn" class="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 hover:border-emerald-500/60 active:scale-95 text-xs font-bold text-white flex items-center gap-2 transition-all cursor-pointer">
+                                <span id="cycle-close-date-display">2026-11-25</span>
+                                <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-400"></i>
+                            </button>
+
+                            <!-- Trang lịch nhỏ hiện ra khi bấm vào ô ngày chốt sổ -->
+                            <div id="mini-calendar-popover" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+                                <div id="mini-calendar-backdrop" class="fixed inset-0 bg-black/70 backdrop-blur-xs"></div>
+                                <div class="relative z-10 w-full max-w-xs bg-[#0f1623] border border-slate-700 rounded-3xl p-4 shadow-2xl space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <button type="button" id="cal-prev-month-btn" class="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white flex items-center justify-center active:scale-90 cursor-pointer">
+                                            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                                        </button>
+                                        <div id="cal-month-year-label" class="text-xs font-bold text-white uppercase tracking-wider"></div>
+                                        <button type="button" id="cal-next-month-btn" class="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white flex items-center justify-center active:scale-90 cursor-pointer">
+                                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+
+                                    <!-- Hàng thứ trong tuần -->
+                                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-500">
+                                        <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span class="text-rose-400">CN</span>
+                                    </div>
+
+                                    <!-- Lưới các ngày trong tháng -->
+                                    <div id="cal-days-grid" class="grid grid-cols-7 gap-1 text-center">
+                                        <!-- Render động -->
+                                    </div>
+
+                                    <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                                        <button type="button" id="cal-today-btn" class="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold active:scale-95 cursor-pointer">
+                                            Hôm nay
+                                        </button>
+                                        <button type="button" id="cal-close-btn" class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-[11px] font-semibold active:scale-95 cursor-pointer">
+                                            Đóng
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bộ chọn xem Chu kỳ đang mở hoặc Các chu kỳ đã chốt -->
+                    <div class="space-y-2">
+                        <label for="cycle-selector" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Xem dữ liệu chu kỳ</label>
+                        <select id="cycle-selector" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <!-- Nạp động -->
+                        </select>
+                    </div>
+
+                    <!-- Biểu đồ biến động chi tiêu theo ngày ở chu kỳ tháng -->
+                    <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-xs font-bold text-white">Biến động chi tiêu theo ngày</h3>
+                                <p class="text-[10px] text-slate-400">Chi tiêu (₫) trong chu kỳ được chọn</p>
+                            </div>
+                            <span id="cycle-total-spent-badge" class="text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-lg">0 ₫</span>
+                        </div>
+                        <div class="relative h-48 flex items-center justify-center">
+                            <canvas id="cycle-daily-chart"></canvas>
+                            <div id="cycle-chart-empty" class="text-center text-slate-500 text-xs hidden">
+                                Chưa có dữ liệu chi tiêu trong chu kỳ này
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TRANG NHỎ 2: QUẢN LÝ THEO NĂM (CHỐT SỔ 31/12) -->
+                <div id="history-subtab-year" class="hidden space-y-4">
+                    <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-2">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">Chu kỳ năm (Chốt 31/12)</span>
+                            <p id="year-close-status-text" class="text-xs text-slate-300 mt-0.5">Kỳ năm kết thúc vào ngày 31/12 hàng năm</p>
+                        </div>
+                        <select id="year-selector" class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <!-- Nạp động các năm -->
+                        </select>
+                    </div>
+
+                    <!-- Biểu đồ biến động chi tiêu theo tháng ở chu kỳ năm -->
+                    <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-xs font-bold text-white">Biến động chi tiêu theo tháng</h3>
+                                <p class="text-[10px] text-slate-400">Tổng hợp T1 – T12 (chốt sổ 31/12)</p>
+                            </div>
+                            <span id="year-total-spent-badge" class="text-[11px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg">0 ₫</span>
+                        </div>
+                        <div class="relative h-52 flex items-center justify-center">
+                            <canvas id="year-monthly-chart"></canvas>
+                            <div id="year-chart-empty" class="text-center text-slate-500 text-xs hidden">
+                                Chưa có dữ liệu chi tiêu trong năm này
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bộ lọc loại giao dịch (Áp dụng cho phạm vi đang xem) -->
+                <div class="flex gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
+                    <button type="button" data-filter="all" class="filter-btn flex-1 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-white shadow-sm transition-all cursor-pointer">Tất cả</button>
+                    <button type="button" data-filter="expense" class="filter-btn flex-1 py-2 rounded-xl text-xs font-semibold text-slate-400 transition-all cursor-pointer">Khoản chi</button>
+                    <button type="button" data-filter="income" class="filter-btn flex-1 py-2 rounded-xl text-xs font-semibold text-slate-400 transition-all cursor-pointer">Khoản thu</button>
+                </div>
+
+                <!-- Danh sách giao dịch theo phạm vi đang chọn -->
+                <ul id="transaction-list" class="space-y-2.5">
+                    <!-- Dữ liệu giao dịch -->
+                </ul>
+
+                <!-- Trạng thái trống -->
+                <div id="empty-state" class="py-12 text-center hidden">
+                    <div class="w-14 h-14 bg-slate-900 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-800">
+                        <i data-lucide="receipt" class="w-7 h-7"></i>
+                    </div>
+                    <p class="text-slate-300 font-medium text-sm">Chưa có giao dịch nào</p>
+                    <p class="text-slate-500 text-xs mt-1">Nhấn nút + bên dưới để thêm mới.</p>
+                </div>
+            </div>
+
+            <!-- TAB 3: BÁO CÁO & BIỂU ĐỒ (STATS) -->
+            <div id="tab-stats" class="hidden space-y-5">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Phân Tích Chi Tiêu</h2>
+                    <p class="text-xs text-slate-400">Tỷ trọng sử dụng ngân sách ở từng hũ</p>
+                </div>
+
+                <div class="bg-slate-900/90 p-5 rounded-3xl border border-slate-800">
+                    <div class="relative h-64 flex items-center justify-center">
+                        <canvas id="expense-chart"></canvas>
+                        <div id="chart-empty" class="text-center text-slate-500 text-sm hidden">
+                            Chưa có khoản chi nào để vẽ biểu đồ
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bảng chi tiết tỷ lệ từng hũ -->
+                <div id="stats-breakdown" class="space-y-2.5">
+                    <!-- Chi tiết tỷ trọng -->
+                </div>
+            </div>
+
+            <!-- TAB 4: THỐNG KÊ TÀI SẢN (ASSETS) -->
+            <div id="tab-assets" class="hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Thống Kê Tài Sản</h2>
+                        <p class="text-xs text-slate-400">Quản lý danh mục tài sản & tăng trưởng từng đợt</p>
+                    </div>
+                    <span id="asset-snapshot-count" class="text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-full">0 đợt</span>
+                </div>
+
+                <!-- 2 trang nhỏ trong Tab Tài Sản: Danh mục & Nhập liệu | Biểu đồ tăng trưởng -->
+                <div class="grid grid-cols-2 gap-2 p-1 bg-slate-900 rounded-2xl border border-slate-800">
+                    <button type="button" id="asset-subtab-portfolio-btn" class="py-2 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5">
+                        <i data-lucide="gem" class="w-3.5 h-3.5"></i>
+                        <span>Tài sản hiện có</span>
+                    </button>
+                    <button type="button" id="asset-subtab-growth-btn" class="py-2 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center gap-1.5">
+                        <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+                        <span>Tăng trưởng (%)</span>
+                    </button>
+                </div>
+
+                <!-- TRANG NHỎ 1: NHẬP TÀI SẢN ĐANG CÓ & TỔNG GIÁ TRỊ TÀI SẢN -->
+                <div id="asset-subtab-portfolio" class="space-y-4">
+                    <!-- Thẻ hiển thị Tổng giá trị tài sản hiện tại -->
+                    <div class="bg-gradient-to-br from-amber-500/20 via-slate-900 to-slate-950 p-4 rounded-3xl border border-amber-400/25 flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-300">Tổng giá trị tài sản</span>
+                            <div id="total-assets-value" class="text-2xl font-extrabold text-white tracking-tight mt-1 truncate">0 ₫</div>
+                            <p id="latest-asset-growth-badge" class="text-[11px] text-slate-400 mt-1">Khai báo mới để ghi nhận mốc tăng trưởng</p>
+                        </div>
+                        <button type="button" id="record-asset-snapshot-btn" class="px-3.5 py-2.5 rounded-2xl bg-emerald-500 text-slate-950 font-bold text-xs active:scale-95 transition-all shrink-0 cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
+                            <i data-lucide="camera" class="w-4 h-4"></i>
+                            <span>Lưu đợt</span>
+                        </button>
+                    </div>
+
+                    <!-- Form thêm thủ công tài sản đang có -->
+                    <form id="asset-form" class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-3">
+                        <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                            <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i>
+                            <span>Thêm tài sản đang có</span>
+                        </div>
+
+                        <div>
+                            <label for="asset-name-input" class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Tên tài sản</label>
+                            <input type="text" id="asset-name-input" placeholder="VD: Vàng SJC, Cổ phiếu, Sổ tiết kiệm, Xe máy..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs bg-slate-950 text-white placeholder-slate-500" required>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label for="asset-value-input" class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Giá trị (VNĐ)</label>
+                                <input type="number" inputmode="numeric" id="asset-value-input" placeholder="0" min="0" step="any" class="w-full px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-bold bg-slate-950 text-white placeholder-slate-600" required>
+                            </div>
+                            <div>
+                                <label for="asset-date-input" class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Ngày cập nhật</label>
+                                <input type="date" id="asset-date-input" class="w-full px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-semibold bg-slate-950 text-white" required>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-emerald-400 border border-emerald-500/30 font-bold py-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 text-xs">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span>Thêm vào danh sách tài sản</span>
+                        </button>
+                    </form>
+
+                    <!-- Danh sách các tài sản hiện có -->
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-white">Danh sách tài sản hiện có</h3>
+                            <span id="asset-items-count" class="text-[11px] text-slate-400">0 tài sản</span>
+                        </div>
+                        <ul id="asset-list" class="space-y-2.5">
+                            <!-- Danh sách tài sản -->
+                        </ul>
+                        <div id="asset-empty-state" class="py-8 text-center bg-slate-900/50 rounded-2xl border border-dashed border-slate-800 hidden">
+                            <p class="text-slate-400 text-xs font-medium">Chưa có tài sản nào được khai báo</p>
+                            <p class="text-slate-500 text-[11px] mt-0.5">Nhập tài sản ở biểu mẫu phía trên để tính tổng tài sản.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TRANG NHỎ 2: BIỂU ĐỒ TĂNG TRƯỞNG TÀI SẢN & % SO VỚI LẦN KHAI BÁO TRƯỚC -->
+                <div id="asset-subtab-growth" class="hidden space-y-4">
+                    <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <h3 class="text-xs font-bold text-white">Biểu đồ tăng trưởng tài sản</h3>
+                                <p class="text-[10px] text-slate-400">Tối đa 6 đợt gần nhất • % so với lần trước (từ đợt #2)</p>
+                            </div>
+                            <span id="latest-growth-pill" class="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-lg">--</span>
+                        </div>
+                        <div class="relative h-56 flex items-center justify-center">
+                            <canvas id="asset-growth-chart"></canvas>
+                            <div id="asset-growth-empty" class="text-center text-slate-500 text-xs hidden">
+                                Chưa có đợt khai báo tài sản nào. Hãy bấm "Lưu đợt" ở trang Tài sản hiện có.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bảng chi tiết từng đợt khai báo & % biến động so với lần trước -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-bold text-white">Lịch sử các đợt khai báo</h3>
+                        <ul id="asset-snapshot-list" class="space-y-2">
+                            <!-- Các đợt khai báo -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Thanh Điều Hướng Dưới Cùng (Mobile Bottom Navigation Bar) -->
+        <nav class="fixed bottom-0 w-full max-w-md bg-[#0b101d]/95 backdrop-blur-xl border-t border-slate-800/90 px-4 pt-2 safe-bottom z-30 flex items-center justify-between">
+            <button type="button" data-tab="home" class="nav-btn flex flex-col items-center gap-1 py-1 text-emerald-400 transition-all cursor-pointer">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold">Tổng quan</span>
+            </button>
+
+            <button type="button" data-tab="history" class="nav-btn flex flex-col items-center gap-1 py-1 text-slate-400 hover:text-slate-200 transition-all cursor-pointer">
+                <i data-lucide="list-ordered" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold">Lịch sử</span>
+            </button>
+
+            <!-- Nút Thêm Giao Dịch Nổi Ở Giữa (Floating Action Button) -->
+            <div class="relative -top-5">
+                <button type="button" id="open-add-modal-btn" class="w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/30 flex items-center justify-center active:scale-90 transition-transform cursor-pointer border-4 border-[#090d16]">
+                    <i data-lucide="plus" class="w-7 h-7 stroke-[2.5]"></i>
+                </button>
+            </div>
+
+            <button type="button" data-tab="stats" class="nav-btn flex flex-col items-center gap-1 py-1 text-slate-400 hover:text-slate-200 transition-all cursor-pointer">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold">Báo cáo</span>
+            </button>
+
+            <button type="button" data-tab="assets" class="nav-btn flex flex-col items-center gap-1 py-1 text-slate-400 hover:text-amber-300 transition-all cursor-pointer">
+                <i data-lucide="gem" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold">Tài sản</span>
+            </button>
+        </nav>
+
+        <!-- BOTTOM SHEET MODAL: THÊM GIAO DỊCH MỚI -->
+        <div id="add-modal" class="fixed inset-0 z-50 hidden flex items-end justify-center">
+            <!-- Nền mờ -->
+            <div id="close-modal-backdrop" class="modal-backdrop fixed inset-0 bg-black/75 backdrop-blur-xs"></div>
+            
+            <!-- Tấm trượt từ dưới lên (Bottom Sheet) -->
+            <div class="modal-sheet relative w-full max-w-md bg-[#0f1623] border-t border-slate-700/80 rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl z-10">
+                <!-- Thanh kéo giả lập trên mobile -->
+                <div class="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mt-3 mb-1 shrink-0"></div>
+                
+                <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between shrink-0">
+                    <h2 class="text-base font-bold text-white">Ghi Nhận Giao Dịch</h2>
+                    <button type="button" id="close-add-modal-btn" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center active:scale-90 cursor-pointer">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Nội dung Form cuộn được bên trong Bottom Sheet -->
+                <form id="transaction-form" class="p-5 space-y-4 overflow-y-auto no-scrollbar safe-bottom">
+                    <!-- Chọn loại giao dịch: Chi tiêu / Thu nhập -->
+                    <div class="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-2xl border border-slate-800">
+                        <button type="button" id="type-expense-btn" class="py-2.5 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all cursor-pointer">
+                            Khoản Chi (-)
+                        </button>
+                        <button type="button" id="type-income-btn" class="py-2.5 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer">
+                            Khoản Thu (+)
+                        </button>
+                    </div>
+
+                    <!-- Số tiền (Đưa lên trên với cỡ chữ lớn chuẩn Mobile Banking) -->
+                    <div>
+                        <label id="amount-label" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Số tiền chi (VNĐ)</label>
+                        <input type="number" inputmode="numeric" id="amount-input" placeholder="0" min="1000" step="any" class="w-full px-4 py-3.5 rounded-2xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xl font-bold bg-slate-950 text-white placeholder-slate-600" required>
+                    </div>
+
+                    <!-- Chọn Hũ (nếu là Chi tiêu) -->
+                    <div id="jar-select-wrapper">
+                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Trích từ hũ</label>
+                        <select id="jar-input" class="w-full px-4 py-3.5 rounded-2xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-medium bg-slate-950 text-white">
+                            <!-- Nạp động -->
+                        </select>
+                    </div>
+
+                    <!-- Nội dung giao dịch -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Nội dung</label>
+                        <input type="text" id="desc-input" placeholder="VD: Ăn trưa, Tiền lương, Cà phê..." class="w-full px-4 py-3.5 rounded-2xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm bg-slate-950 text-white placeholder-slate-500" required>
+                    </div>
+
+                    <!-- Khu vực tùy chỉnh số tiền phân bổ cho 6 hũ khi chọn Khoản Thu -->
+                    <div id="income-allocation-wrapper" class="hidden p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Phân bổ 6 hũ</span>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" id="clear-alloc-btn" class="text-[11px] bg-slate-800 active:bg-rose-500/20 text-slate-300 border border-slate-700 px-2.5 py-1.5 rounded-xl font-medium cursor-pointer flex items-center gap-1">
+                                    <i data-lucide="eraser" class="w-3 h-3"></i>
+                                    <span>Xóa hết</span>
+                                </button>
+                                <button type="button" id="auto-split-btn" class="text-[11px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl font-semibold cursor-pointer">
+                                    Gợi ý chuẩn
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Thanh trạng thái số tiền còn thừa -->
+                        <div id="allocation-status-box" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2">
+                            <span id="allocation-status-label" class="text-xs text-slate-300">Tiền thừa chưa chia:</span>
+                            <span id="allocation-remaining-amount" class="text-xs font-bold text-emerald-400">0 ₫</span>
+                        </div>
+
+                        <!-- Cảnh báo vượt mức -->
+                        <div id="allocation-warning" class="hidden p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/40 text-rose-400 text-xs flex items-start gap-2">
+                            <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 mt-0.5"></i>
+                            <span>Tổng phân bổ đang <strong>vượt quá tổng thu nhập</strong>!</span>
+                        </div>
+                        
+                        <div id="jar-allocation-inputs" class="space-y-2">
+                            <!-- 6 ô nhập phân bổ -->
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-emerald-500 active:scale-[0.98] text-slate-950 font-bold py-4 rounded-2xl transition-all shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2 text-sm">
+                        <i data-lucide="check" class="w-5 h-5 stroke-[2.5]"></i>
+                        <span>Xác Nhận Lưu</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Thông báo Toast kiểu Mobile Pill ở phía trên -->
+        <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur-md text-white border border-slate-700 px-4 py-2.5 rounded-full shadow-2xl text-xs font-semibold transform -translate-y-24 opacity-0 transition-all duration-300 flex items-center gap-2 z-50 whitespace-nowrap">
+            <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+            <span id="toast-message">Thông báo</span>
+        </div>
+
+    </div>
+
+    <script>
+        // Định nghĩa chuẩn 6 Hũ Tài Chính (JARS System)
+        const JARS = [
+            { id: 'nec', name: 'Thiết yếu (NEC)', shortName: 'Thiết yếu', defaultPercent: 55, icon: 'home', color: '#3b82f6', badgeBg: 'bg-blue-500/15 text-blue-400 border-blue-500/25', barColor: 'bg-blue-500' },
+            { id: 'ltss', name: 'Tiết kiệm (LTSS)', shortName: 'Tiết kiệm', defaultPercent: 10, icon: 'shield-check', color: '#10b981', badgeBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25', barColor: 'bg-emerald-500' },
+            { id: 'edu', name: 'Giáo dục (EDU)', shortName: 'Giáo dục', defaultPercent: 10, icon: 'graduation-cap', color: '#8b5cf6', badgeBg: 'bg-violet-500/15 text-violet-400 border-violet-500/25', barColor: 'bg-violet-500' },
+            { id: 'play', name: 'Hưởng thụ (PLAY)', shortName: 'Hưởng thụ', defaultPercent: 10, icon: 'sparkles', color: '#ec4899', badgeBg: 'bg-pink-500/15 text-pink-400 border-pink-500/25', barColor: 'bg-pink-500' },
+            { id: 'ffa', name: 'Tự do TC (FFA)', shortName: 'Tự do TC', defaultPercent: 10, icon: 'trending-up', color: '#f59e0b', badgeBg: 'bg-amber-500/15 text-amber-400 border-amber-500/25', barColor: 'bg-amber-500' },
+            { id: 'give', name: 'Cho đi (GIVE)', shortName: 'Cho đi', defaultPercent: 5, icon: 'heart-handshake', color: '#f43f5e', badgeBg: 'bg-rose-500/15 text-rose-400 border-rose-500/25', barColor: 'bg-rose-500' }
+        ];
+
+        // Dữ liệu mẫu ban đầu
+        const DEFAULT_TRANSACTIONS = [
+            { 
+                id: 101, 
+                desc: 'Nhận lương tháng 11', 
+                amount: 20000000, 
+                type: 'income', 
+                allocations: { nec: 10000000, ltss: 2500000, edu: 2000000, play: 2000000, ffa: 2500000, give: 1000000 },
+                date: '2026-11-05' 
+            },
+            { id: 102, desc: 'Tiền thuê nhà & Điện nước', amount: 4500000, type: 'expense', jarId: 'nec', date: '2026-11-06' },
+            { id: 103, desc: 'Đi siêu thị & Ăn uống', amount: 1850000, type: 'expense', jarId: 'nec', date: '2026-11-10' },
+            { id: 104, desc: 'Khóa học tiếng Anh', amount: 1200000, type: 'expense', jarId: 'edu', date: '2026-11-12' },
+            { id: 105, desc: 'Xem phim cuối tuần', amount: 650000, type: 'expense', jarId: 'play', date: '2026-11-15' },
+            { id: 106, desc: 'Mua quỹ ETF tích lũy', amount: 1500000, type: 'expense', jarId: 'ffa', date: '2026-11-18' },
+            { id: 107, desc: 'Quà sinh nhật bạn thân', amount: 400000, type: 'expense', jarId: 'give', date: '2026-11-20' }
+        ];
+
+        // Trạng thái ứng dụng
+        let transactions = JSON.parse(localStorage.getItem('canvas_jars_expenses_v2')) || [...DEFAULT_TRANSACTIONS];
+        const STORAGE_CYCLES_KEY = 'canvas_jars_closed_cycles_v1';
+        const STORAGE_CYCLE_SETTINGS_KEY = 'canvas_jars_cycle_settings_v1';
+
+        // Danh sách các chu kỳ nhỏ đã chốt sổ thủ công
+        // Mỗi chu kỳ gồm: { id, name, startDate, endDate, closedDate }
+        let closedCycles = JSON.parse(localStorage.getItem(STORAGE_CYCLES_KEY)) || [];
+
+        // Thiết lập ngày chốt sổ thủ công cho chu kỳ nhỏ hiện tại (người dùng tự chọn theo ngày nhận lương)
+        let cycleSettings = JSON.parse(localStorage.getItem(STORAGE_CYCLE_SETTINGS_KEY)) || {
+            activeStartDate: '2026-11-01',
+            manualCloseDate: '2026-11-25'
+        };
+
+        // Hàm cộng thêm số ngày vào chuỗi YYYY-MM-DD theo múi giờ UTC để tránh lệch ngày do DST/múi giờ
+        function addDaysToDateStr(dateStr, daysToAdd) {
+            const parts = dateStr.split('-').map(Number);
+            const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + daysToAdd));
+            return dt.toISOString().split('T')[0];
+        }
+
+        // Tự động sửa các chu kỳ cũ đang bị trùng ngày kết thúc và ngày mở đầu kỳ kế tiếp
+        function normalizeCyclesConsistency() {
+            let changed = false;
+
+            closedCycles = closedCycles.map(c => {
+                const end = c.endDate || c.closedDate;
+                if (!c.endDate && c.closedDate) {
+                    changed = true;
+                }
+                return { ...c, endDate: end, closedDate: end };
+            });
+
+            if (closedCycles.length > 0) {
+                // Chu kỳ mới nhất nằm ở đầu mảng (closedCycles[0])
+                const latestClosedEnd = closedCycles[0].endDate;
+                const expectedNextStart = addDaysToDateStr(latestClosedEnd, 1);
+
+                if (cycleSettings.activeStartDate !== expectedNextStart) {
+                    cycleSettings.activeStartDate = expectedNextStart;
+                    changed = true;
+                }
+
+                // Nếu ngày chốt sổ thủ công hiện tại nhỏ hơn hoặc bằng ngày bắt đầu kỳ mới thì đẩy sang kỳ tiếp theo
+                if (!cycleSettings.manualCloseDate || cycleSettings.manualCloseDate <= cycleSettings.activeStartDate) {
+                    cycleSettings.manualCloseDate = addDaysToDateStr(cycleSettings.activeStartDate, 29);
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                saveData();
+            }
+        }
+
+        normalizeCyclesConsistency();
+
+        let currentType = 'expense';
+        let currentFilter = 'all';
+        let currentTab = 'home';
+        let historySubTab = 'cycle'; // 'cycle' | 'year'
+        let selectedCycleId = 'active'; // 'active' hoặc id của chu kỳ đã chốt
+        let selectedYear = String(new Date().getFullYear());
+        let expenseChart = null;
+        let cycleDailyChart = null;
+        let yearMonthlyChart = null;
+        let assetGrowthChart = null;
+
+        // Dữ liệu tài sản hiện có và các đợt khai báo tài sản
+        const STORAGE_ASSETS_KEY = 'canvas_jars_assets_v1';
+        const STORAGE_ASSET_SNAPSHOTS_KEY = 'canvas_jars_asset_snapshots_v1';
+
+        const DEFAULT_ASSETS = [
+            { id: 1, name: 'Sổ tiết kiệm ngân hàng', value: 80000000, date: '2026-10-01' },
+            { id: 2, name: 'Vàng tích trữ', value: 25000000, date: '2026-10-01' }
+        ];
+
+        const DEFAULT_ASSET_SNAPSHOTS = [
+            { id: 'snap_1', date: '2026-10-01', totalValue: 105000000, itemCount: 2 },
+            { id: 'snap_2', date: '2026-11-21', totalValue: 120000000, itemCount: 2 }
+        ];
+
+        let assets = JSON.parse(localStorage.getItem(STORAGE_ASSETS_KEY)) || [...DEFAULT_ASSETS];
+        let assetSnapshots = JSON.parse(localStorage.getItem(STORAGE_ASSET_SNAPSHOTS_KEY)) || [...DEFAULT_ASSET_SNAPSHOTS];
+        let assetSubTab = 'portfolio'; // 'portfolio' | 'growth'
+
+        // DOM Elements cho Tab Tài Sản
+        const assetSubtabPortfolioBtn = document.getElementById('asset-subtab-portfolio-btn');
+        const assetSubtabGrowthBtn = document.getElementById('asset-subtab-growth-btn');
+        const assetSubtabPortfolio = document.getElementById('asset-subtab-portfolio');
+        const assetSubtabGrowth = document.getElementById('asset-subtab-growth');
+        const assetForm = document.getElementById('asset-form');
+        const assetNameInput = document.getElementById('asset-name-input');
+        const assetValueInput = document.getElementById('asset-value-input');
+        const assetDateInput = document.getElementById('asset-date-input');
+        const assetListEl = document.getElementById('asset-list');
+        const assetEmptyStateEl = document.getElementById('asset-empty-state');
+        const totalAssetsValueEl = document.getElementById('total-assets-value');
+        const assetItemsCountEl = document.getElementById('asset-items-count');
+        const assetSnapshotCountEl = document.getElementById('asset-snapshot-count');
+        const latestAssetGrowthBadgeEl = document.getElementById('latest-asset-growth-badge');
+        const latestGrowthPillEl = document.getElementById('latest-growth-pill');
+        const recordAssetSnapshotBtn = document.getElementById('record-asset-snapshot-btn');
+        const assetSnapshotListEl = document.getElementById('asset-snapshot-list');
+
+        // DOM Elements cho Giao dịch, 6 Hũ & Lịch sử
+        const addModal = document.getElementById('add-modal');
+        const openAddModalBtn = document.getElementById('open-add-modal-btn');
+        const closeAddModalBtn = document.getElementById('close-add-modal-btn');
+        const closeModalBackdrop = document.getElementById('close-modal-backdrop');
+        const transactionForm = document.getElementById('transaction-form');
+        const amountInput = document.getElementById('amount-input');
+        const amountLabel = document.getElementById('amount-label');
+        const jarInput = document.getElementById('jar-input');
+        const jarSelectWrapper = document.getElementById('jar-select-wrapper');
+        const descInput = document.getElementById('desc-input');
+        const typeExpenseBtn = document.getElementById('type-expense-btn');
+        const typeIncomeBtn = document.getElementById('type-income-btn');
+        const incomeAllocationWrapper = document.getElementById('income-allocation-wrapper');
+        const jarAllocationInputs = document.getElementById('jar-allocation-inputs');
+        const autoSplitBtn = document.getElementById('auto-split-btn');
+        const clearAllocBtn = document.getElementById('clear-alloc-btn');
+        const allocationRemainingAmount = document.getElementById('allocation-remaining-amount');
+        const allocationStatusLabel = document.getElementById('allocation-status-label');
+        const allocationWarning = document.getElementById('allocation-warning');
+        const recentTransactionListEl = document.getElementById('recent-transaction-list');
+        const transactionListEl = document.getElementById('transaction-list');
+        const emptyStateEl = document.getElementById('empty-state');
+        const transactionCountEl = document.getElementById('transaction-count');
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        const resetDemoBtn = document.getElementById('reset-demo-btn');
+
+        // DOM Elements cho Lịch sử chu kỳ nhỏ & chu kỳ năm
+        const subtabCycleBtn = document.getElementById('subtab-cycle-btn');
+        const subtabYearBtn = document.getElementById('subtab-year-btn');
+        const historySubtabCycle = document.getElementById('history-subtab-cycle');
+        const historySubtabYear = document.getElementById('history-subtab-year');
+        const currentCycleTitleEl = document.getElementById('current-cycle-title');
+        const currentCycleRangeEl = document.getElementById('current-cycle-range');
+        const closeCycleBtn = document.getElementById('close-cycle-btn');
+        const cycleCloseDateBtn = document.getElementById('cycle-close-date-btn');
+        const cycleCloseDateDisplay = document.getElementById('cycle-close-date-display');
+        const cycleSelectorEl = document.getElementById('cycle-selector');
+        const yearSelectorEl = document.getElementById('year-selector');
+        const cycleTotalSpentBadge = document.getElementById('cycle-total-spent-badge');
+        const yearTotalSpentBadge = document.getElementById('year-total-spent-badge');
+
+        // DOM Elements cho trang lịch nhỏ chọn ngày chốt sổ
+        const miniCalendarPopover = document.getElementById('mini-calendar-popover');
+        const miniCalendarBackdrop = document.getElementById('mini-calendar-backdrop');
+        const calPrevMonthBtn = document.getElementById('cal-prev-month-btn');
+        const calNextMonthBtn = document.getElementById('cal-next-month-btn');
+        const calMonthYearLabel = document.getElementById('cal-month-year-label');
+        const calDaysGrid = document.getElementById('cal-days-grid');
+        const calTodayBtn = document.getElementById('cal-today-btn');
+        const calCloseBtn = document.getElementById('cal-close-btn');
+        let calendarViewDate = new Date();
+
+        // Hiển thị thông báo Toast
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-message');
+            if (!toast || !msgEl) return;
+            msgEl.textContent = message;
+            toast.classList.remove('-translate-y-24', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('-translate-y-24', 'opacity-0');
+            }, 2500);
+        }
+
+        // Định dạng tiền tệ VNĐ
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('vi-VN', {
+                style: 'currency',
+                currency: 'VND'
+            }).format(amount);
+        }
+
+        // Định dạng gọn tiền tệ cho màn hình điện thoại (VD: 12.5 tr)
+        function formatCompactCurrency(amount) {
+            const abs = Math.abs(amount);
+            const sign = amount < 0 ? '-' : '';
+            if (abs >= 1_000_000_000) {
+                return sign + (abs / 1_000_000_000).toFixed(2).replace(/\.00$/, '') + ' tỷ';
+            }
+            if (abs >= 1_000_000) {
+                return sign + (abs / 1_000_000).toFixed(1).replace(/\.0$/, '') + ' tr';
+            }
+            if (abs >= 1_000) {
+                return sign + Math.round(abs / 1_000) + 'k';
+            }
+            return formatCurrency(amount);
+        }
+
+        // Chống XSS
+        function escapeHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Lưu dữ liệu (tự động đồng bộ lên Cloud Firestore nếu đã kết nối)
+        function saveData(skipCloudPush = false) {
+            try {
+                localStorage.setItem('canvas_jars_expenses_v2', JSON.stringify(transactions));
+                localStorage.setItem(STORAGE_CYCLES_KEY, JSON.stringify(closedCycles));
+                localStorage.setItem(STORAGE_CYCLE_SETTINGS_KEY, JSON.stringify(cycleSettings));
+                localStorage.setItem(STORAGE_ASSETS_KEY, JSON.stringify(assets));
+                localStorage.setItem(STORAGE_ASSET_SNAPSHOTS_KEY, JSON.stringify(assetSnapshots));
+            } catch (e) {
+                console.error('Lỗi lưu trữ cục bộ:', e);
+            }
+            if (!skipCloudPush && typeof window.scheduleCloudSync === 'function') {
+                window.scheduleCloudSync();
+            }
+        }
+
+        // Chuyển tab trên thanh điều hướng dưới cùng
+        function switchTab(tabName) {
+            currentTab = tabName;
+            const tabs = {
+                home: document.getElementById('tab-home'),
+                history: document.getElementById('tab-history'),
+                stats: document.getElementById('tab-stats'),
+                assets: document.getElementById('tab-assets')
+            };
+
+            Object.entries(tabs).forEach(([key, el]) => {
+                if (!el) return;
+                el.classList.toggle('hidden', key !== tabName);
+            });
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                const isActive = btn.dataset.tab === tabName;
+                btn.classList.toggle('text-emerald-400', isActive);
+                btn.classList.toggle('text-slate-400', !isActive);
+            });
+
+            if (tabName === 'stats') {
+                renderExpenseChart();
+            } else if (tabName === 'history') {
+                renderHistoryControlsAndCharts();
+            } else if (tabName === 'assets') {
+                renderAssetsTab();
+            }
+            lucide.createIcons();
+        }
+
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.dataset.tab) {
+                    switchTab(btn.dataset.tab);
+                }
+            });
+        });
+
+        // Mở / đóng Bottom Sheet thêm giao dịch
+        function openAddModal(defaultType = 'expense', preselectedJarId = null) {
+            setTransactionType(defaultType);
+            if (preselectedJarId && jarInput) {
+                jarInput.value = preselectedJarId;
+            }
+            if (addModal) {
+                addModal.classList.remove('hidden');
+            }
+            lucide.createIcons();
+            setTimeout(() => {
+                if (amountInput) amountInput.focus();
+            }, 120);
+        }
+
+        function closeAddModal() {
+            if (addModal) {
+                addModal.classList.add('hidden');
+            }
+        }
+
+        if (openAddModalBtn) {
+            openAddModalBtn.addEventListener('click', () => openAddModal(currentType));
+        }
+        if (closeAddModalBtn) {
+            closeAddModalBtn.addEventListener('click', closeAddModal);
+        }
+        if (closeModalBackdrop) {
+            closeModalBackdrop.addEventListener('click', closeAddModal);
+        }
+
+        // Nạp danh sách 6 hũ vào ô chọn khi chi tiêu
+        function populateJarSelect() {
+            if (!jarInput) return;
+            jarInput.innerHTML = '';
+            JARS.forEach(jar => {
+                const option = document.createElement('option');
+                option.value = jar.id;
+                option.textContent = `${jar.name} (${jar.defaultPercent}%)`;
+                jarInput.appendChild(option);
+            });
+        }
+
+        // Chuyển đổi giữa Khoản Chi và Khoản Thu
+        function setTransactionType(type) {
+            currentType = type;
+            if (type === 'expense') {
+                if (typeExpenseBtn) {
+                    typeExpenseBtn.className = 'py-2.5 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all cursor-pointer';
+                }
+                if (typeIncomeBtn) {
+                    typeIncomeBtn.className = 'py-2.5 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer';
+                }
+                if (amountLabel) amountLabel.textContent = 'Số tiền chi (VNĐ)';
+                if (jarSelectWrapper) jarSelectWrapper.classList.remove('hidden');
+                if (incomeAllocationWrapper) incomeAllocationWrapper.classList.add('hidden');
+            } else {
+                if (typeIncomeBtn) {
+                    typeIncomeBtn.className = 'py-2.5 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer';
+                }
+                if (typeExpenseBtn) {
+                    typeExpenseBtn.className = 'py-2.5 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer';
+                }
+                if (amountLabel) amountLabel.textContent = 'Số tiền thu (VNĐ)';
+                if (jarSelectWrapper) jarSelectWrapper.classList.add('hidden');
+                if (incomeAllocationWrapper) incomeAllocationWrapper.classList.remove('hidden');
+                updateAllocationSummary();
+            }
+            lucide.createIcons();
+        }
+
+        if (typeExpenseBtn) {
+            typeExpenseBtn.addEventListener('click', () => setTransactionType('expense'));
+        }
+        if (typeIncomeBtn) {
+            typeIncomeBtn.addEventListener('click', () => setTransactionType('income'));
+        }
+
+        // Tạo 6 ô nhập phân bổ tiền cho từng hũ
+        function renderAllocationInputs() {
+            if (!jarAllocationInputs) return;
+            jarAllocationInputs.innerHTML = '';
+
+            JARS.forEach(jar => {
+                const row = document.createElement('div');
+                row.className = 'p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5';
+                row.innerHTML = `
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-semibold text-slate-200 truncate">${jar.shortName}</span>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span id="alloc-pct-${jar.id}" class="text-[11px] font-bold text-slate-400 bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded-md">0%</span>
+                            <button type="button" data-fill-rem="${jar.id}" class="fill-rem-btn text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 active:scale-95 cursor-pointer" title="Dồn hết phần tiền thừa vào hũ này">
+                                + Thừa
+                            </button>
+                        </div>
+                    </div>
+                    <input type="number" inputmode="numeric" id="alloc-input-${jar.id}" data-jar-id="${jar.id}" placeholder="0" min="0" step="any" class="jar-alloc-input w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-bold text-white">
+                `;
+                jarAllocationInputs.appendChild(row);
+            });
+
+            document.querySelectorAll('.jar-alloc-input').forEach(inp => {
+                inp.addEventListener('input', updateAllocationSummary);
+            });
+
+            document.querySelectorAll('.fill-rem-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetJarId = btn.dataset.fillRem;
+                    const totalIncome = parseFloat(amountInput?.value) || 0;
+                    let sumOther = 0;
+                    JARS.forEach(j => {
+                        if (j.id !== targetJarId) {
+                            const el = document.getElementById(`alloc-input-${j.id}`);
+                            sumOther += Math.max(0, parseFloat(el?.value) || 0);
+                        }
+                    });
+                    const remaining = Math.max(0, totalIncome - sumOther);
+                    const targetEl = document.getElementById(`alloc-input-${targetJarId}`);
+                    if (targetEl) {
+                        targetEl.value = remaining > 0 ? Math.round(remaining) : 0;
+                    }
+                    updateAllocationSummary();
+                });
+            });
+        }
+
+        function getCurrentAllocationsMap() {
+            const map = {};
+            JARS.forEach(jar => {
+                const el = document.getElementById(`alloc-input-${jar.id}`);
+                const val = parseFloat(el?.value);
+                map[jar.id] = Number.isFinite(val) && val > 0 ? val : 0;
+            });
+            return map;
+        }
+
+        function updateAllocationSummary() {
+            const totalIncome = Math.max(0, parseFloat(amountInput?.value) || 0);
+            const allocMap = getCurrentAllocationsMap();
+            const totalAllocated = Object.values(allocMap).reduce((acc, v) => acc + v, 0);
+            const remaining = totalIncome - totalAllocated;
+
+            JARS.forEach(jar => {
+                const pctEl = document.getElementById(`alloc-pct-${jar.id}`);
+                if (!pctEl) return;
+                const val = allocMap[jar.id] || 0;
+                const pct = totalIncome > 0 ? ((val / totalIncome) * 100).toFixed(1).replace(/\.0$/, '') : '0';
+                pctEl.textContent = `${pct}%`;
+            });
+
+            if (allocationRemainingAmount) {
+                allocationRemainingAmount.textContent = formatCurrency(remaining);
+                allocationRemainingAmount.className = remaining < 0
+                    ? 'text-xs font-bold text-rose-400'
+                    : 'text-xs font-bold text-emerald-400';
+            }
+
+            if (allocationWarning) {
+                allocationWarning.classList.toggle('hidden', remaining >= 0);
+            }
+        }
+
+        if (amountInput) {
+            amountInput.addEventListener('input', () => {
+                if (currentType === 'income') {
+                    updateAllocationSummary();
+                }
+            });
+        }
+
+        if (clearAllocBtn) {
+            clearAllocBtn.addEventListener('click', () => {
+                JARS.forEach(jar => {
+                    const el = document.getElementById(`alloc-input-${jar.id}`);
+                    if (el) el.value = '';
+                });
+                updateAllocationSummary();
+                showToast('Đã xóa số tiền phân bổ ở 6 hũ');
+            });
+        }
+
+        if (autoSplitBtn) {
+            autoSplitBtn.addEventListener('click', () => {
+                const totalIncome = Math.max(0, parseFloat(amountInput?.value) || 0);
+                if (totalIncome <= 0) {
+                    showToast('Hãy nhập số tiền thu trước!');
+                    return;
+                }
+                let allocatedSoFar = 0;
+                JARS.forEach((jar, idx) => {
+                    const el = document.getElementById(`alloc-input-${jar.id}`);
+                    if (!el) return;
+                    if (idx === JARS.length - 1) {
+                        el.value = Math.max(0, Math.round(totalIncome - allocatedSoFar));
+                    } else {
+                        const amount = Math.round((totalIncome * jar.defaultPercent) / 100);
+                        allocatedSoFar += amount;
+                        el.value = amount;
+                    }
+                });
+                updateAllocationSummary();
+                showToast('Đã gợi ý chia theo tỷ lệ chuẩn 6 hũ');
+            });
+        }
+
+        // Xử lý submit form thêm giao dịch
+        if (transactionForm) {
+            transactionForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const desc = descInput?.value.trim() || '';
+                const amount = parseFloat(amountInput?.value);
+
+                if (!desc || !Number.isFinite(amount) || amount <= 0) {
+                    showToast('Vui lòng nhập nội dung và số tiền hợp lệ!');
+                    return;
+                }
+
+                const todayStr = new Date().toISOString().split('T')[0];
+
+                if (currentType === 'income') {
+                    const allocMap = getCurrentAllocationsMap();
+                    const totalAllocated = Object.values(allocMap).reduce((s, v) => s + v, 0);
+
+                    if (totalAllocated > amount) {
+                        showToast('Tổng phân bổ vượt quá tổng thu nhập!');
+                        return;
+                    }
+
+                    // Nếu chưa nhập phân bổ nào thì tự động chia theo tỷ lệ chuẩn
+                    let finalAlloc = allocMap;
+                    if (totalAllocated === 0) {
+                        finalAlloc = {};
+                        let acc = 0;
+                        JARS.forEach((jar, idx) => {
+                            if (idx === JARS.length - 1) {
+                                finalAlloc[jar.id] = Math.max(0, Math.round(amount - acc));
+                            } else {
+                                const v = Math.round((amount * jar.defaultPercent) / 100);
+                                acc += v;
+                                finalAlloc[jar.id] = v;
+                            }
+                        });
+                    }
+
+                    transactions.unshift({
+                        id: Date.now(),
+                        desc,
+                        amount,
+                        type: 'income',
+                        allocations: finalAlloc,
+                        date: todayStr
+                    });
+                    showToast('Đã ghi nhận khoản thu & phân bổ vào 6 hũ');
+                } else {
+                    const jarId = jarInput?.value || 'nec';
+                    transactions.unshift({
+                        id: Date.now(),
+                        desc,
+                        amount,
+                        type: 'expense',
+                        jarId,
+                        date: todayStr
+                    });
+                    showToast('Đã ghi nhận khoản chi');
+                }
+
+                saveData();
+                renderTransactions();
+                if (transactionForm) transactionForm.reset();
+                renderAllocationInputs();
+                closeAddModal();
+            });
+        }
+
+        // Xóa giao dịch
+        window.deleteTransaction = function(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveData();
+            renderTransactions();
+            showToast('Đã xóa giao dịch');
+        };
+
+        // Tính toán số dư từng hũ và tổng quan
+        function calculateJarStats() {
+            const stats = {};
+            JARS.forEach(jar => {
+                stats[jar.id] = {
+                    allocated: 0,
+                    spent: 0,
+                    balance: 0
+                };
+            });
+
+            let totalIncome = 0;
+            let totalExpense = 0;
+
+            transactions.forEach(tx => {
+                if (tx.type === 'income') {
+                    totalIncome += tx.amount;
+                    const alloc = tx.allocations || {};
+                    let hasExplicit = false;
+                    JARS.forEach(jar => {
+                        if (typeof alloc[jar.id] === 'number') {
+                            hasExplicit = true;
+                            stats[jar.id].allocated += alloc[jar.id];
+                        }
+                    });
+                    if (!hasExplicit) {
+                        JARS.forEach(jar => {
+                            stats[jar.id].allocated += (tx.amount * jar.defaultPercent) / 100;
+                        });
+                    }
+                } else if (tx.type === 'expense') {
+                    totalExpense += tx.amount;
+                    const targetId = stats[tx.jarId] ? tx.jarId : 'nec';
+                    stats[targetId].spent += tx.amount;
+                }
+            });
+
+            JARS.forEach(jar => {
+                stats[jar.id].balance = stats[jar.id].allocated - stats[jar.id].spent;
+            });
+
+            return {
+                stats,
+                totalIncome,
+                totalExpense,
+                balance: totalIncome - totalExpense
+            };
+        }
+
+        // Render thẻ tổng quan & 6 hũ tài chính
+        function renderDashboardAndJars() {
+            const { stats, totalIncome, totalExpense, balance } = calculateJarStats();
+
+            const balanceEl = document.getElementById('balance-amount');
+            const incomeEl = document.getElementById('income-amount');
+            const expenseEl = document.getElementById('expense-amount');
+            const jarsContainer = document.getElementById('jars-container');
+
+            if (balanceEl) balanceEl.textContent = formatCurrency(balance);
+            if (incomeEl) incomeEl.textContent = `+${formatCompactCurrency(totalIncome)}`;
+            if (expenseEl) expenseEl.textContent = `-${formatCompactCurrency(totalExpense)}`;
+
+            if (!jarsContainer) return;
+            jarsContainer.innerHTML = '';
+
+            JARS.forEach(jar => {
+                const st = stats[jar.id];
+                const pctOfTotalIncome = totalIncome > 0
+                    ? ((st.allocated / totalIncome) * 100).toFixed(1).replace(/\.0$/, '')
+                    : jar.defaultPercent;
+                const usedPct = st.allocated > 0 ? Math.min(100, Math.round((st.spent / st.allocated) * 100)) : 0;
+                const isOver = st.balance < 0;
+
+                const card = document.createElement('div');
+                card.className = 'bg-slate-900/90 active:scale-[0.98] p-3.5 rounded-2xl border border-slate-800 space-y-2.5 transition-all cursor-pointer';
+                card.onclick = () => openAddModal('expense', jar.id);
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between gap-1">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="w-6 h-6 rounded-lg border ${jar.badgeBg} flex items-center justify-center shrink-0">
+                                <i data-lucide="${jar.icon}" class="w-3.5 h-3.5"></i>
+                            </span>
+                            <span class="text-xs font-bold text-white truncate">${jar.shortName}</span>
+                        </div>
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${jar.badgeBg} shrink-0">${pctOfTotalIncome}%</span>
+                    </div>
+                    <div>
+                        <div class="text-sm font-extrabold ${isOver ? 'text-rose-400' : 'text-white'} truncate">${formatCurrency(st.balance)}</div>
+                        <div class="text-[10px] text-slate-400 truncate">Đã chi: ${formatCompactCurrency(st.spent)}</div>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div class="${isOver ? 'bg-rose-500' : jar.barColor} h-1.5 rounded-full transition-all duration-300" style="width: ${usedPct}%"></div>
+                    </div>
+                `;
+                jarsContainer.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        // Tạo 1 dòng giao dịch
+        function createTransactionItemElement(tx, showDelete = true) {
+            const li = document.createElement('li');
+            const isIncome = tx.type === 'income';
+            const jarObj = JARS.find(j => j.id === tx.jarId) || JARS[0];
+
+            li.className = 'bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-3';
+            li.innerHTML = `
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                        isIncome
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
+                            : jarObj.badgeBg
+                    }">
+                        <i data-lucide="${isIncome ? 'arrow-down-left' : jarObj.icon}" class="w-4 h-4"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold text-white truncate">${escapeHTML(tx.desc)}</p>
+                        <div class="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-400">
+                            <span>${escapeHTML(tx.date)}</span>
+                            <span>•</span>
+                            <span class="truncate">${isIncome ? 'Phân bổ 6 hũ' : jarObj.shortName}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <span class="text-xs font-extrabold ${isIncome ? 'text-emerald-400' : 'text-rose-400'}">
+                        ${isIncome ? '+' : '-'}${formatCompactCurrency(tx.amount)}
+                    </span>
+                    ${showDelete ? `
+                        <button type="button" onclick="deleteTransaction(${tx.id})" class="w-8 h-8 rounded-xl bg-slate-800/80 text-slate-400 hover:text-rose-400 flex items-center justify-center active:scale-90 cursor-pointer" title="Xóa">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+            return li;
+        }
+
+        // Render danh sách giao dịch gần đây và lịch sử
+        function renderTransactions() {
+            renderDashboardAndJars();
+
+            if (recentTransactionListEl) {
+                recentTransactionListEl.innerHTML = '';
+                const top3 = transactions.slice(0, 3);
+                if (top3.length === 0) {
+                    recentTransactionListEl.innerHTML = '<li class="text-xs text-slate-500 text-center py-4 bg-slate-900/50 rounded-2xl border border-slate-800/70">Chưa có giao dịch gần đây</li>';
+                } else {
+                    top3.forEach(tx => recentTransactionListEl.appendChild(createTransactionItemElement(tx, false)));
+                }
+            }
+
+            renderHistoryControlsAndCharts();
+
+            const scoped = getScopedTransactions();
+            const filtered = scoped.filter(tx => {
+                if (currentFilter === 'all') return true;
+                return tx.type === currentFilter;
+            });
+
+            if (transactionCountEl) {
+                transactionCountEl.textContent = `${filtered.length} giao dịch`;
+            }
+
+            if (transactionListEl) {
+                transactionListEl.innerHTML = '';
+                if (filtered.length === 0) {
+                    if (emptyStateEl) emptyStateEl.classList.remove('hidden');
+                } else {
+                    if (emptyStateEl) emptyStateEl.classList.add('hidden');
+                    filtered.forEach(tx => transactionListEl.appendChild(createTransactionItemElement(tx, true)));
+                }
+            }
+
+            if (currentTab === 'stats') {
+                renderExpenseChart();
+            }
+
+            lucide.createIcons();
+        }
+
+        // Bộ lọc Tất cả / Khoản chi / Khoản thu
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterBtns.forEach(b => {
+                    b.className = 'filter-btn flex-1 py-2 rounded-xl text-xs font-semibold text-slate-400 transition-all cursor-pointer';
+                });
+                btn.className = 'filter-btn flex-1 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-white shadow-sm transition-all cursor-pointer';
+                currentFilter = btn.dataset.filter || 'all';
+                renderTransactions();
+            });
+        });
+
+        // Chuyển 2 trang nhỏ trong Tab Lịch Sử
+        function setHistorySubTab(sub) {
+            historySubTab = sub;
+            const isCycle = sub === 'cycle';
+            if (historySubtabCycle) historySubtabCycle.classList.toggle('hidden', !isCycle);
+            if (historySubtabYear) historySubtabYear.classList.toggle('hidden', isCycle);
+
+            if (subtabCycleBtn) {
+                subtabCycleBtn.className = isCycle
+                    ? 'py-2 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5'
+                    : 'py-2 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center gap-1.5';
+            }
+            if (subtabYearBtn) {
+                subtabYearBtn.className = !isCycle
+                    ? 'py-2 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5'
+                    : 'py-2 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center gap-1.5';
+            }
+            renderTransactions();
+        }
+
+        if (subtabCycleBtn) subtabCycleBtn.addEventListener('click', () => setHistorySubTab('cycle'));
+        if (subtabYearBtn) subtabYearBtn.addEventListener('click', () => setHistorySubTab('year'));
+
+        // Trang lịch nhỏ chọn ngày chốt sổ
+        function openMiniCalendar() {
+            if (!miniCalendarPopover) return;
+            const baseStr = cycleSettings.manualCloseDate || new Date().toISOString().split('T')[0];
+            const [y, m, d] = baseStr.split('-').map(Number);
+            calendarViewDate = new Date(y, (m || 1) - 1, d || 1);
+            renderMiniCalendar();
+            miniCalendarPopover.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeMiniCalendar() {
+            if (miniCalendarPopover) {
+                miniCalendarPopover.classList.add('hidden');
+            }
+        }
+
+        function renderMiniCalendar() {
+            if (!calDaysGrid || !calMonthYearLabel) return;
+            const year = calendarViewDate.getFullYear();
+            const month = calendarViewDate.getMonth();
+            calMonthYearLabel.textContent = `Tháng ${month + 1} / ${year}`;
+
+            const firstDayOfMonth = new Date(year, month, 1);
+            // Chuyển Chủ nhật (0) thành chỉ số 6 để tuần bắt đầu từ Thứ 2 (0)
+            const startOffset = (firstDayOfMonth.getDay() + 6) % 7;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const selectedDateStr = cycleSettings.manualCloseDate;
+
+            calDaysGrid.innerHTML = '';
+            for (let i = 0; i < startOffset; i++) {
+                const spacer = document.createElement('div');
+                spacer.className = 'h-8';
+                calDaysGrid.appendChild(spacer);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const mm = String(month + 1).padStart(2, '0');
+                const dd = String(day).padStart(2, '0');
+                const dateStr = `${year}-${mm}-${dd}`;
+                const isSelected = dateStr === selectedDateStr;
+                const isBeforeStart = cycleSettings.activeStartDate && dateStr < cycleSettings.activeStartDate;
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = String(day);
+                btn.disabled = isBeforeStart;
+                btn.className = `h-8 rounded-xl text-xs font-semibold transition-all ${
+                    isBeforeStart
+                        ? 'text-slate-700 cursor-not-allowed'
+                        : isSelected
+                            ? 'bg-emerald-500 text-slate-950 font-extrabold shadow-sm cursor-pointer'
+                            : 'text-slate-200 hover:bg-slate-800 active:scale-90 cursor-pointer'
+                }`;
+
+                if (!isBeforeStart) {
+                    btn.addEventListener('click', () => {
+                        cycleSettings.manualCloseDate = dateStr;
+                        saveData();
+                        closeMiniCalendar();
+                        renderTransactions();
+                        showToast(`Đã chọn ngày chốt sổ: ${dateStr}`);
+                    });
+                }
+                calDaysGrid.appendChild(btn);
+            }
+        }
+
+        if (cycleCloseDateBtn) cycleCloseDateBtn.addEventListener('click', openMiniCalendar);
+        if (miniCalendarBackdrop) miniCalendarBackdrop.addEventListener('click', closeMiniCalendar);
+        if (calCloseBtn) calCloseBtn.addEventListener('click', closeMiniCalendar);
+        if (calPrevMonthBtn) {
+            calPrevMonthBtn.addEventListener('click', () => {
+                calendarViewDate.setMonth(calendarViewDate.getMonth() - 1);
+                renderMiniCalendar();
+            });
+        }
+        if (calNextMonthBtn) {
+            calNextMonthBtn.addEventListener('click', () => {
+                calendarViewDate.setMonth(calendarViewDate.getMonth() + 1);
+                renderMiniCalendar();
+            });
+        }
+        if (calTodayBtn) {
+            calTodayBtn.addEventListener('click', () => {
+                const todayStr = new Date().toISOString().split('T')[0];
+                if (cycleSettings.activeStartDate && todayStr < cycleSettings.activeStartDate) {
+                    showToast('Ngày hôm nay nhỏ hơn ngày mở đầu chu kỳ hiện tại');
+                    return;
+                }
+                cycleSettings.manualCloseDate = todayStr;
+                saveData();
+                closeMiniCalendar();
+                renderTransactions();
+                showToast(`Đã chọn ngày chốt sổ: ${todayStr}`);
+            });
+        }
+
+        // Chốt sổ chu kỳ nhỏ thủ công: ngày chốt sổ là ngày kết thúc kỳ hiện tại, ngày kế tiếp (+1) là ngày mở đầu kỳ mới
+        if (closeCycleBtn) {
+            closeCycleBtn.addEventListener('click', () => {
+                const startDate = cycleSettings.activeStartDate;
+                const endDate = cycleSettings.manualCloseDate;
+
+                if (!endDate || endDate < startDate) {
+                    showToast('Ngày chốt sổ phải lớn hơn hoặc bằng ngày mở đầu chu kỳ!');
+                    return;
+                }
+
+                const cycleNumber = closedCycles.length + 1;
+                closedCycles.unshift({
+                    id: `cycle_${Date.now()}`,
+                    name: `Chu kỳ lương #${cycleNumber}`,
+                    startDate,
+                    endDate,
+                    closedDate: endDate
+                });
+
+                const nextStartDate = addDaysToDateStr(endDate, 1);
+                cycleSettings.activeStartDate = nextStartDate;
+                cycleSettings.manualCloseDate = addDaysToDateStr(nextStartDate, 29);
+
+                saveData();
+                renderTransactions();
+                showToast(`Đã chốt sổ kỳ kết thúc ${endDate}. Kỳ mới mở từ ${nextStartDate}`);
+            });
+        }
+
+        function getSelectedCycleRange() {
+            if (selectedCycleId === 'active') {
+                return {
+                    id: 'active',
+                    label: `Chu kỳ #${closedCycles.length + 1} (Đang mở)`,
+                    startDate: cycleSettings.activeStartDate,
+                    endDate: cycleSettings.manualCloseDate,
+                    isClosed: false
+                };
+            }
+            const found = closedCycles.find(c => c.id === selectedCycleId);
+            if (!found) {
+                return {
+                    id: 'active',
+                    label: `Chu kỳ #${closedCycles.length + 1} (Đang mở)`,
+                    startDate: cycleSettings.activeStartDate,
+                    endDate: cycleSettings.manualCloseDate,
+                    isClosed: false
+                };
+            }
+            return {
+                id: found.id,
+                label: `${found.name} (Đã chốt)`,
+                startDate: found.startDate,
+                endDate: found.endDate || found.closedDate,
+                isClosed: true
+            };
+        }
+
+        function getDateRangeList(startStr, endStr) {
+            if (!startStr || !endStr || startStr > endStr) return [];
+            const dates = [];
+            let cur = startStr;
+            let guard = 0;
+            while (cur <= endStr && guard < 120) {
+                dates.push(cur);
+                cur = addDaysToDateStr(cur, 1);
+                guard++;
+            }
+            return dates;
+        }
+
+        function getScopedTransactions() {
+            if (historySubTab === 'year') {
+                return transactions.filter(tx => tx.date && tx.date.startsWith(`${selectedYear}-`));
+            }
+            const range = getSelectedCycleRange();
+            return transactions.filter(tx => {
+                if (!tx.date) return false;
+                if (range.startDate && tx.date < range.startDate) return false;
+                if (range.endDate && tx.date > range.endDate) return false;
+                return true;
+            });
+        }
+
+        function renderHistoryControlsAndCharts() {
+            if (currentCycleTitleEl) {
+                currentCycleTitleEl.textContent = `Chu kỳ lương #${closedCycles.length + 1} (Đang mở)`;
+            }
+            if (currentCycleRangeEl) {
+                currentCycleRangeEl.textContent = `Mở đầu ${cycleSettings.activeStartDate} • Kết thúc (chốt sổ) ${cycleSettings.manualCloseDate}`;
+            }
+            if (cycleCloseDateDisplay) {
+                cycleCloseDateDisplay.textContent = cycleSettings.manualCloseDate;
+            }
+
+            if (cycleSelectorEl) {
+                const prevVal = selectedCycleId;
+                cycleSelectorEl.innerHTML = '';
+
+                const activeOpt = document.createElement('option');
+                activeOpt.value = 'active';
+                activeOpt.textContent = `Đang mở: ${cycleSettings.activeStartDate} → kết thúc ${cycleSettings.manualCloseDate}`;
+                cycleSelectorEl.appendChild(activeOpt);
+
+                closedCycles.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    const endStr = c.endDate || c.closedDate;
+                    opt.textContent = `Đã chốt: ${c.startDate} → kết thúc ${endStr}`;
+                    cycleSelectorEl.appendChild(opt);
+                });
+
+                const validIds = ['active', ...closedCycles.map(c => c.id)];
+                selectedCycleId = validIds.includes(prevVal) ? prevVal : 'active';
+                cycleSelectorEl.value = selectedCycleId;
+            }
+
+            if (yearSelectorEl) {
+                const yearsSet = new Set([String(new Date().getFullYear()), '2026']);
+                transactions.forEach(tx => {
+                    if (tx.date && tx.date.length >= 4) {
+                        yearsSet.add(tx.date.slice(0, 4));
+                    }
+                });
+                const sortedYears = Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
+                if (!sortedYears.includes(selectedYear)) {
+                    selectedYear = sortedYears[0];
+                }
+                yearSelectorEl.innerHTML = '';
+                sortedYears.forEach(yr => {
+                    const opt = document.createElement('option');
+                    opt.value = yr;
+                    opt.textContent = `Năm ${yr} (Chốt 31/12)`;
+                    yearSelectorEl.appendChild(opt);
+                });
+                yearSelectorEl.value = selectedYear;
+            }
+
+            const yearCloseStatusText = document.getElementById('year-close-status-text');
+            if (yearCloseStatusText) {
+                yearCloseStatusText.textContent = `Kỳ năm ${selectedYear} (01/01/${selectedYear} – 31/12/${selectedYear})`;
+            }
+
+            renderCycleDailyChart();
+            renderYearMonthlyChart();
+        }
+
+        if (cycleSelectorEl) {
+            cycleSelectorEl.addEventListener('change', () => {
+                selectedCycleId = cycleSelectorEl.value;
+                renderTransactions();
+            });
+        }
+
+        if (yearSelectorEl) {
+            yearSelectorEl.addEventListener('change', () => {
+                selectedYear = yearSelectorEl.value;
+                renderTransactions();
+            });
+        }
+
+        function renderCycleDailyChart() {
+            const canvas = document.getElementById('cycle-daily-chart');
+            const emptyEl = document.getElementById('cycle-chart-empty');
+            if (!canvas) return;
+
+            const range = getSelectedCycleRange();
+            const dateList = getDateRangeList(range.startDate, range.endDate);
+            const dailyTotals = {};
+            dateList.forEach(d => { dailyTotals[d] = 0; });
+
+            let totalSpent = 0;
+            transactions.forEach(tx => {
+                if (tx.type === 'expense' && tx.date && Object.prototype.hasOwnProperty.call(dailyTotals, tx.date)) {
+                    dailyTotals[tx.date] += tx.amount;
+                    totalSpent += tx.amount;
+                }
+            });
+
+            if (cycleTotalSpentBadge) {
+                cycleTotalSpentBadge.textContent = formatCompactCurrency(totalSpent);
+            }
+
+            if (cycleDailyChart) {
+                cycleDailyChart.destroy();
+                cycleDailyChart = null;
+            }
+
+            if (dateList.length === 0 || totalSpent === 0) {
+                canvas.style.display = 'none';
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                return;
+            }
+
+            canvas.style.display = 'block';
+            if (emptyEl) emptyEl.classList.add('hidden');
+
+            const labels = dateList.map(d => d.slice(5)); // MM-DD
+            const values = dateList.map(d => dailyTotals[d]);
+
+            cycleDailyChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Chi tiêu theo ngày (₫)',
+                        data: values,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.16)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 2.5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#94a3b8', font: { size: 9 }, maxTicksLimit: 8 },
+                            grid: { color: 'rgba(148, 163, 184, 0.08)' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { size: 9 },
+                                callback: v => formatCompactCurrency(v)
+                            },
+                            grid: { color: 'rgba(148, 163, 184, 0.12)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderYearMonthlyChart() {
+            const canvas = document.getElementById('year-monthly-chart');
+            const emptyEl = document.getElementById('year-chart-empty');
+            if (!canvas) return;
+
+            const monthlyTotals = Array(12).fill(0);
+            let totalYearSpent = 0;
+
+            transactions.forEach(tx => {
+                if (tx.type === 'expense' && tx.date && tx.date.startsWith(`${selectedYear}-`)) {
+                    const monthIdx = parseInt(tx.date.slice(5, 7), 10) - 1;
+                    if (monthIdx >= 0 && monthIdx < 12) {
+                        monthlyTotals[monthIdx] += tx.amount;
+                        totalYearSpent += tx.amount;
+                    }
+                }
+            });
+
+            if (yearTotalSpentBadge) {
+                yearTotalSpentBadge.textContent = formatCompactCurrency(totalYearSpent);
+            }
+
+            if (yearMonthlyChart) {
+                yearMonthlyChart.destroy();
+                yearMonthlyChart = null;
+            }
+
+            if (totalYearSpent === 0) {
+                canvas.style.display = 'none';
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                return;
+            }
+
+            canvas.style.display = 'block';
+            if (emptyEl) emptyEl.classList.add('hidden');
+
+            const monthLabels = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
+
+            yearMonthlyChart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: monthLabels,
+                    datasets: [{
+                        label: `Chi tiêu năm ${selectedYear} (₫)`,
+                        data: monthlyTotals,
+                        backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                        borderColor: '#f59e0b',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#94a3b8', font: { size: 10 } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { size: 9 },
+                                callback: v => formatCompactCurrency(v)
+                            },
+                            grid: { color: 'rgba(148, 163, 184, 0.12)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Biểu đồ phân bổ chi tiêu ở Tab Báo cáo
+        function renderExpenseChart() {
+            const canvas = document.getElementById('expense-chart');
+            const emptyEl = document.getElementById('chart-empty');
+            const breakdownEl = document.getElementById('stats-breakdown');
+            if (!canvas) return;
+
+            const { stats, totalExpense } = calculateJarStats();
+
+            if (expenseChart) {
+                expenseChart.destroy();
+                expenseChart = null;
+            }
+
+            if (breakdownEl) {
+                breakdownEl.innerHTML = '';
+                JARS.forEach(jar => {
+                    const spent = stats[jar.id]?.spent || 0;
+                    const pct = totalExpense > 0 ? Math.round((spent / totalExpense) * 100) : 0;
+                    const item = document.createElement('div');
+                    item.className = 'bg-slate-900/90 p-3 rounded-2xl border border-slate-800 flex items-center justify-between';
+                    item.innerHTML = `
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-full" style="background-color: ${jar.color}"></span>
+                            <span class="text-xs font-semibold text-white">${jar.shortName}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-bold text-slate-200">${formatCompactCurrency(spent)}</span>
+                            <span class="text-[10px] text-slate-400 ml-1.5">(${pct}%)</span>
+                        </div>
+                    `;
+                    breakdownEl.appendChild(item);
+                });
+            }
+
+            if (totalExpense <= 0) {
+                canvas.style.display = 'none';
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                return;
+            }
+
+            canvas.style.display = 'block';
+            if (emptyEl) emptyEl.classList.add('hidden');
+
+            expenseChart = new Chart(canvas.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: JARS.map(j => j.shortName),
+                    datasets: [{
+                        data: JARS.map(j => stats[j.id]?.spent || 0),
+                        backgroundColor: JARS.map(j => j.color),
+                        borderColor: '#0f172a',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#cbd5e1', font: { size: 11 }, boxWidth: 12 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Quản lý Tab Thống Kê Tài Sản
+        function getTotalAssetsValue() {
+            return assets.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
+        }
+
+        function setAssetSubTab(sub) {
+            assetSubTab = sub;
+            const isPortfolio = sub === 'portfolio';
+            if (assetSubtabPortfolio) assetSubtabPortfolio.classList.toggle('hidden', !isPortfolio);
+            if (assetSubtabGrowth) assetSubtabGrowth.classList.toggle('hidden', isPortfolio);
+
+            if (assetSubtabPortfolioBtn) {
+                assetSubtabPortfolioBtn.className = isPortfolio
+                    ? 'py-2 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5'
+                    : 'py-2 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center gap-1.5';
+            }
+            if (assetSubtabGrowthBtn) {
+                assetSubtabGrowthBtn.className = !isPortfolio
+                    ? 'py-2 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5'
+                    : 'py-2 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center gap-1.5';
+            }
+            renderAssetsTab();
+        }
+
+        if (assetSubtabPortfolioBtn) assetSubtabPortfolioBtn.addEventListener('click', () => setAssetSubTab('portfolio'));
+        if (assetSubtabGrowthBtn) assetSubtabGrowthBtn.addEventListener('click', () => setAssetSubTab('growth'));
+
+        if (assetDateInput && !assetDateInput.value) {
+            assetDateInput.value = new Date().toISOString().split('T')[0];
+        }
+
+        if (assetForm) {
+            assetForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = assetNameInput?.value.trim() || '';
+                const val = parseFloat(assetValueInput?.value);
+                const dt = assetDateInput?.value || new Date().toISOString().split('T')[0];
+
+                if (!name || !Number.isFinite(val) || val < 0) {
+                    showToast('Vui lòng nhập tên tài sản và giá trị hợp lệ!');
+                    return;
+                }
+
+                assets.unshift({
+                    id: Date.now(),
+                    name,
+                    value: val,
+                    date: dt
+                });
+
+                saveData();
+                if (assetNameInput) assetNameInput.value = '';
+                if (assetValueInput) assetValueInput.value = '';
+                renderAssetsTab();
+                showToast('Đã thêm tài sản vào danh sách');
+            });
+        }
+
+        window.deleteAssetItem = function(id) {
+            assets = assets.filter(a => a.id !== id);
+            saveData();
+            renderAssetsTab();
+            showToast('Đã xóa tài sản');
+        };
+
+        if (recordAssetSnapshotBtn) {
+            recordAssetSnapshotBtn.addEventListener('click', () => {
+                const totalVal = getTotalAssetsValue();
+                const todayStr = new Date().toISOString().split('T')[0];
+                assetSnapshots.push({
+                    id: `snap_${Date.now()}`,
+                    date: todayStr,
+                    totalValue: totalVal,
+                    itemCount: assets.length
+                });
+                saveData();
+                renderAssetsTab();
+                showToast(`Đã lưu đợt khai báo tài sản (${formatCompactCurrency(totalVal)})`);
+            });
+        }
+
+        function renderAssetsTab() {
+            const totalVal = getTotalAssetsValue();
+            if (totalAssetsValueEl) totalAssetsValueEl.textContent = formatCurrency(totalVal);
+            if (assetItemsCountEl) assetItemsCountEl.textContent = `${assets.length} tài sản`;
+            if (assetSnapshotCountEl) assetSnapshotCountEl.textContent = `${assetSnapshots.length} đợt`;
+
+            // Tính % tăng trưởng của đợt mới nhất so với đợt ngay trước đó
+            if (assetSnapshots.length >= 2) {
+                const prevSnap = assetSnapshots[assetSnapshots.length - 2];
+                const currSnap = assetSnapshots[assetSnapshots.length - 1];
+                const pct = prevSnap.totalValue > 0
+                    ? (((currSnap.totalValue - prevSnap.totalValue) / prevSnap.totalValue) * 100).toFixed(1)
+                    : '0.0';
+                const numPct = parseFloat(pct);
+                const sign = numPct > 0 ? '+' : '';
+                if (latestAssetGrowthBadgeEl) {
+                    latestAssetGrowthBadgeEl.textContent = `Đợt gần nhất: ${sign}${pct}% so với lần trước (${prevSnap.date})`;
+                    latestAssetGrowthBadgeEl.className = numPct >= 0
+                        ? 'text-[11px] text-emerald-400 font-semibold mt-1'
+                        : 'text-[11px] text-rose-400 font-semibold mt-1';
+                }
+                if (latestGrowthPillEl) {
+                    latestGrowthPillEl.textContent = `${sign}${pct}%`;
+                    latestGrowthPillEl.className = numPct >= 0
+                        ? 'text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-lg'
+                        : 'text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/25 px-2 py-0.5 rounded-lg';
+                }
+            } else {
+                if (latestAssetGrowthBadgeEl) {
+                    latestAssetGrowthBadgeEl.textContent = 'Cần ít nhất 2 đợt khai báo để tính % tăng trưởng';
+                    latestAssetGrowthBadgeEl.className = 'text-[11px] text-slate-400 mt-1';
+                }
+                if (latestGrowthPillEl) {
+                    latestGrowthPillEl.textContent = '--';
+                }
+            }
+
+            if (assetListEl) {
+                assetListEl.innerHTML = '';
+                if (assets.length === 0) {
+                    if (assetEmptyStateEl) assetEmptyStateEl.classList.remove('hidden');
+                } else {
+                    if (assetEmptyStateEl) assetEmptyStateEl.classList.add('hidden');
+                    assets.forEach(item => {
+                        const li = document.createElement('li');
+                        li.className = 'bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-2';
+                        li.innerHTML = `
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold text-white truncate">${escapeHTML(item.name)}</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Cập nhật: ${escapeHTML(item.date)}</p>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="text-xs font-extrabold text-amber-300">${formatCompactCurrency(item.value)}</span>
+                                <button type="button" onclick="deleteAssetItem(${item.id})" class="w-8 h-8 rounded-xl bg-slate-800/80 text-slate-400 hover:text-rose-400 flex items-center justify-center active:scale-90 cursor-pointer" title="Xóa tài sản">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        `;
+                        assetListEl.appendChild(li);
+                    });
+                }
+            }
+
+            // Danh sách các đợt khai báo & % tăng trưởng so với lần trước
+            if (assetSnapshotListEl) {
+                assetSnapshotListEl.innerHTML = '';
+                if (assetSnapshots.length === 0) {
+                    assetSnapshotListEl.innerHTML = '<li class="text-xs text-slate-500 text-center py-4 bg-slate-900/50 rounded-2xl border border-slate-800">Chưa có đợt khai báo nào</li>';
+                } else {
+                    for (let i = assetSnapshots.length - 1; i >= 0; i--) {
+                        const snap = assetSnapshots[i];
+                        let growthText = 'Đợt đầu tiên';
+                        let growthClass = 'text-slate-400 bg-slate-800 border-slate-700';
+
+                        if (i > 0) {
+                            const prev = assetSnapshots[i - 1];
+                            const pct = prev.totalValue > 0
+                                ? (((snap.totalValue - prev.totalValue) / prev.totalValue) * 100).toFixed(1)
+                                : '0.0';
+                            const num = parseFloat(pct);
+                            growthText = `${num > 0 ? '+' : ''}${pct}% so với đợt #${i}`;
+                            growthClass = num >= 0
+                                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25'
+                                : 'text-rose-400 bg-rose-500/10 border-rose-500/25';
+                        }
+
+                        const li = document.createElement('li');
+                        li.className = 'bg-slate-900/90 p-3 rounded-2xl border border-slate-800 flex items-center justify-between gap-2';
+                        li.innerHTML = `
+                            <div>
+                                <p class="text-xs font-bold text-white">Đợt #${i + 1} • ${escapeHTML(snap.date)}</p>
+                                <p class="text-[11px] font-semibold text-amber-300 mt-0.5">${formatCurrency(snap.totalValue)}</p>
+                            </div>
+                            <span class="text-[10px] font-bold px-2 py-1 rounded-lg border ${growthClass} shrink-0">${growthText}</span>
+                        `;
+                        assetSnapshotListEl.appendChild(li);
+                    }
+                }
+            }
+
+            renderAssetGrowthChart();
+            lucide.createIcons();
+        }
+
+        // Biểu đồ tăng trưởng tài sản: tối đa 6 đợt gần nhất, % tăng trưởng từ đợt #2 trở đi so với đợt trước
+        function renderAssetGrowthChart() {
+            const canvas = document.getElementById('asset-growth-chart');
+            const emptyEl = document.getElementById('asset-growth-empty');
+            if (!canvas) return;
+
+            if (assetGrowthChart) {
+                assetGrowthChart.destroy();
+                assetGrowthChart = null;
+            }
+
+            if (assetSnapshots.length === 0) {
+                canvas.style.display = 'none';
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                return;
+            }
+
+            canvas.style.display = 'block';
+            if (emptyEl) emptyEl.classList.add('hidden');
+
+            // Lấy tối đa 6 đợt gần nhất nhưng giữ chỉ số gốc để tính % so với đợt ngay trước đó (từ đợt #2 trở đi)
+            const startIdx = Math.max(0, assetSnapshots.length - 6);
+            const windowSnaps = assetSnapshots.slice(startIdx);
+
+            const labels = windowSnaps.map((s, idx) => `#${startIdx + idx + 1} (${s.date.slice(5)})`);
+            const barValues = windowSnaps.map(s => s.totalValue);
+            const growthPercentages = windowSnaps.map((s, idx) => {
+                const actualIndex = startIdx + idx;
+                if (actualIndex === 0) return null; // Bỏ qua lần khai báo đầu tiên
+                const prevSnap = assetSnapshots[actualIndex - 1];
+                if (!prevSnap || prevSnap.totalValue <= 0) return 0;
+                return parseFloat((((s.totalValue - prevSnap.totalValue) / prevSnap.totalValue) * 100).toFixed(1));
+            });
+
+            assetGrowthChart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Tổng tài sản (₫)',
+                            data: barValues,
+                            yAxisID: 'yValue',
+                            backgroundColor: 'rgba(16, 185, 129, 0.55)',
+                            borderColor: '#10b981',
+                            borderWidth: 1.5,
+                            borderRadius: 8
+                        },
+                        {
+                            type: 'line',
+                            label: '% Tăng trưởng so với lần trước',
+                            data: growthPercentages,
+                            yAxisID: 'yPct',
+                            borderColor: '#fbbf24',
+                            backgroundColor: '#fbbf24',
+                            borderWidth: 2.5,
+                            tension: 0.25,
+                            pointRadius: 4,
+                            spanGaps: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#cbd5e1', font: { size: 10 }, boxWidth: 10 }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#94a3b8', font: { size: 9 } },
+                            grid: { display: false }
+                        },
+                        yValue: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#34d399',
+                                font: { size: 9 },
+                                callback: v => formatCompactCurrency(v)
+                            },
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                        },
+                        yPct: {
+                            type: 'linear',
+                            position: 'right',
+                            ticks: {
+                                color: '#fbbf24',
+                                font: { size: 9 },
+                                callback: v => `${v > 0 ? '+' : ''}${v}%`
+                            },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Khôi phục dữ liệu mẫu
+        if (resetDemoBtn) {
+            resetDemoBtn.addEventListener('click', () => {
+                transactions = [...DEFAULT_TRANSACTIONS];
+                closedCycles = [];
+                cycleSettings = {
+                    activeStartDate: '2026-11-01',
+                    manualCloseDate: '2026-11-25'
+                };
+                selectedCycleId = 'active';
+                assets = [...DEFAULT_ASSETS];
+                assetSnapshots = [...DEFAULT_ASSET_SNAPSHOTS];
+                saveData();
+                renderTransactions();
+                renderAssetsTab();
+                showToast('Đã khôi phục dữ liệu mẫu');
+            });
+        }
+
+        populateJarSelect();
+        renderAllocationInputs();
+        setTransactionType('expense');
+        renderTransactions();
+        renderAssetsTab();
+
+        // Cấu hình PWA cài đặt trực tiếp trên Android / iOS
+        let deferredPrompt;
+        const installBtn = document.getElementById('install-pwa-btn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.classList.remove('hidden');
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                installBtn.classList.add('hidden');
+            }
+            deferredPrompt = null;
+        });
+
+        (function setupMobilePWA() {
+            try {
+                const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#090d16"/><circle cx="256" cy="256" r="180" fill="#10b981" fill-opacity="0.18"/><path d="M176 216h160v136a24 24 0 0 1-24 24H200a24 24 0 0 1-24-24V216zm24-48h112l16 32H184l16-32z" fill="#10b981"/></svg>`;
+                const iconUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(iconSvg);
+
+                const appleIcon = document.createElement('link');
+                appleIcon.rel = 'apple-touch-icon';
+                appleIcon.href = iconUrl;
+                document.head.appendChild(appleIcon);
+
+                const manifest = {
+                    name: '6 Hũ Tài Chính',
+                    short_name: '6 Hũ',
+                    description: 'Ứng dụng di động quản lý chi tiêu 6 chiếc hũ',
+                    start_url: './',
+                    display: 'standalone',
+                    background_color: '#090d16',
+                    theme_color: '#090d16',
+                    orientation: 'portrait',
+                    icons: [
+                        { src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+                        { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+                    ]
+                };
+
+                const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+                const manifestLink = document.createElement('link');
+                manifestLink.rel = 'manifest';
+                manifestLink.href = URL.createObjectURL(manifestBlob);
+                document.head.appendChild(manifestLink);
+
+                if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')) {
+                    const swCode = `
+                        self.addEventListener('install', (e) => self.skipWaiting());
+                        self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+                        self.addEventListener('fetch', (e) => {});
+                    `;
+                    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+                    navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+                }
+            } catch (err) {
+                console.warn('PWA setup:', err);
+            }
+        })();
+    </script>
+
+    <!-- TÍCH HỢP FIREBASE AUTHENTICATION & CLOUD FIRESTORE (ĐỒNG BỘ THỜI GIAN THỰC) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import {
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
+            signOut,
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import {
+            getFirestore,
+            doc,
+            setDoc,
+            onSnapshot
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const cloudAuthBtn = document.getElementById('cloud-auth-btn');
+        const cloudAuthLabel = document.getElementById('cloud-auth-label');
+        const cloudStatusIcon = document.getElementById('cloud-status-icon');
+        const cloudAccountBar = document.getElementById('cloud-account-bar');
+        const cloudUserAvatar = document.getElementById('cloud-user-avatar');
+        const cloudUserName = document.getElementById('cloud-user-name');
+        const cloudSyncStatus = document.getElementById('cloud-sync-status');
+        const cloudGoogleSigninBtn = document.getElementById('cloud-google-signin-btn');
+        const cloudSyncNowBtn = document.getElementById('cloud-sync-now-btn');
+        const cloudSignoutBtn = document.getElementById('cloud-signout-btn');
+
+        function setCloudStatus(text, isError = false) {
+            if (!cloudSyncStatus) return;
+            cloudSyncStatus.textContent = text;
+            cloudSyncStatus.className = isError
+                ? 'text-[10px] text-rose-400 block truncate'
+                : 'text-[10px] text-slate-400 block truncate';
+        }
+
+        function updateCloudHeaderUi(user) {
+            const isLoggedIn = Boolean(user);
+            const isGoogleUser = Boolean(user && !user.isAnonymous && user.email);
+
+            if (cloudAuthLabel) {
+                cloudAuthLabel.textContent = isGoogleUser
+                    ? (user.displayName?.split(' ')[0] || 'Đã đồng bộ')
+                    : (isLoggedIn ? 'Cloud Bật' : 'Đồng bộ');
+            }
+            if (cloudStatusIcon) {
+                cloudStatusIcon.setAttribute(
+                    'class',
+                    isLoggedIn
+                        ? 'w-3.5 h-3.5 text-emerald-400'
+                        : 'w-3.5 h-3.5 text-amber-400'
+                );
+            }
+            if (cloudAuthBtn) {
+                cloudAuthBtn.className = isLoggedIn
+                    ? 'text-[11px] bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 px-2.5 py-1.5 rounded-xl font-semibold active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer'
+                    : 'text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl font-semibold active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer';
+            }
+
+            if (cloudUserName) {
+                cloudUserName.textContent = isGoogleUser
+                    ? user.email
+                    : (isLoggedIn ? `Phiên đồng bộ (${user.uid})` : 'Chưa kết nối');
+            }
+            if (cloudUserAvatar) {
+                if (isGoogleUser && user.photoURL) {
+                    cloudUserAvatar.src = user.photoURL;
+                    cloudUserAvatar.classList.remove('hidden');
+                } else {
+                    cloudUserAvatar.classList.add('hidden');
+                }
+            }
+            if (cloudGoogleSigninBtn) {
+                cloudGoogleSigninBtn.classList.toggle('hidden', isGoogleUser);
+            }
+            if (cloudSignoutBtn) {
+                cloudSignoutBtn.classList.toggle('hidden', !isGoogleUser);
+            }
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        async function initFirebaseSync() {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'jars-finance-project';
+            const fallbackFirebaseConfig = {
+                apiKey: "AIzaSyC1M55kWBpU-e9xEa9rdtprQhopERE9VXU",
+                authDomain: "jars-finance-project.firebaseapp.com",
+                projectId: "jars-finance-project",
+                storageBucket: "jars-finance-project.firebasestorage.app",
+                messagingSenderId: "764273168803",
+                appId: "1:764273168803:web:9765b2ca08706bf5f38a16",
+                measurementId: "G-8PF6E5GG85"
+            };
+            let firebaseConfig = null;
+
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                try {
+                    firebaseConfig = typeof __firebase_config === 'string'
+                        ? JSON.parse(__firebase_config)
+                        : __firebase_config;
+                } catch (e) {
+                    console.warn('Cấu hình đám mây không hợp lệ, dùng cấu hình dự án mặc định:', e);
+                }
+            }
+
+            if (!firebaseConfig || !firebaseConfig.apiKey) {
+                firebaseConfig = fallbackFirebaseConfig;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+
+            let currentUser = null;
+            let unsubscribeSnapshot = null;
+            let syncDebounceTimer = null;
+            let isApplyingRemote = false;
+
+            function getUserDocRef(uid) {
+                // Tuân thủ đúng đường dẫn dữ liệu riêng tư của người dùng: /artifacts/{appId}/users/{userId}/{collectionName}/{docId}
+                return doc(db, 'artifacts', appId, 'users', uid, 'jars_backup', 'main_state');
+            }
+
+            async function pushStateToCloud() {
+                if (!currentUser || isApplyingRemote) return;
+                setCloudStatus('Đang lưu lên đám mây...');
+                try {
+                    const docRef = getUserDocRef(currentUser.uid);
+                    await setDoc(docRef, {
+                        transactions: JSON.stringify(transactions),
+                        closedCycles: JSON.stringify(closedCycles),
+                        cycleSettings: JSON.stringify(cycleSettings),
+                        assets: JSON.stringify(assets),
+                        assetSnapshots: JSON.stringify(assetSnapshots),
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+
+                    const timeLabel = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                    setCloudStatus(`Đã đồng bộ đám mây lúc ${timeLabel}`);
+                } catch (err) {
+                    console.error('Lỗi ghi dữ liệu đám mây:', err);
+                    setCloudStatus('Lỗi đồng bộ lên đám mây', true);
+                }
+            }
+
+            window.scheduleCloudSync = function() {
+                if (!currentUser || isApplyingRemote) return;
+                clearTimeout(syncDebounceTimer);
+                setCloudStatus('Đang chờ đồng bộ...');
+                syncDebounceTimer = setTimeout(() => {
+                    pushStateToCloud();
+                }, 600);
+            };
+
+            function subscribeUserData(user) {
+                if (unsubscribeSnapshot) {
+                    unsubscribeSnapshot();
+                    unsubscribeSnapshot = null;
+                }
+                if (!user) return;
+
+                const docRef = getUserDocRef(user.uid);
+                unsubscribeSnapshot = onSnapshot(
+                    docRef,
+                    (snap) => {
+                        if (!snap.exists()) {
+                            // Lần đầu tiên: đẩy dữ liệu hiện có lên đám mây
+                            pushStateToCloud();
+                            return;
+                        }
+                        const data = snap.data();
+                        if (!data) return;
+
+                        isApplyingRemote = true;
+                        try {
+                            if (typeof data.transactions === 'string') {
+                                transactions = JSON.parse(data.transactions);
+                            }
+                            if (typeof data.closedCycles === 'string') {
+                                closedCycles = JSON.parse(data.closedCycles);
+                            }
+                            if (typeof data.cycleSettings === 'string') {
+                                cycleSettings = { ...cycleSettings, ...JSON.parse(data.cycleSettings) };
+                            }
+                            if (typeof data.assets === 'string') {
+                                assets = JSON.parse(data.assets);
+                            }
+                            if (typeof data.assetSnapshots === 'string') {
+                                assetSnapshots = JSON.parse(data.assetSnapshots);
+                            }
+
+                            normalizeCyclesConsistency();
+                            saveData(true);
+                            renderTransactions();
+                            renderAssetsTab();
+                            setCloudStatus('Dữ liệu đã đồng bộ mới nhất');
+                        } catch (parseErr) {
+                            console.error('Lỗi giải mã dữ liệu đám mây:', parseErr);
+                        } finally {
+                            isApplyingRemote = false;
+                        }
+                    },
+                    (error) => {
+                        console.error('Lỗi lắng nghe dữ liệu đám mây:', error);
+                        setCloudStatus('Mất kết nối đồng bộ thời gian thực', true);
+                    }
+                );
+            }
+
+            // RULE 3: Thực hiện xác thực trước khi truy vấn dữ liệu
+            try {
+                const redirectResult = await getRedirectResult(auth);
+                if (redirectResult && redirectResult.user) {
+                    showToast('Đã đăng nhập tài khoản Google!');
+                } else if (!auth.currentUser) {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                }
+            } catch (authErr) {
+                console.error('Lỗi đăng nhập ban đầu:', authErr);
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                updateCloudHeaderUi(user);
+                if (user) {
+                    subscribeUserData(user);
+                } else if (unsubscribeSnapshot) {
+                    unsubscribeSnapshot();
+                    unsubscribeSnapshot = null;
+                }
+            });
+
+            if (cloudAuthBtn) {
+                cloudAuthBtn.addEventListener('click', () => {
+                    if (cloudAccountBar) {
+                        cloudAccountBar.classList.toggle('hidden');
+                    }
+                });
+            }
+
+            if (cloudGoogleSigninBtn) {
+                cloudGoogleSigninBtn.addEventListener('click', async () => {
+                    const provider = new GoogleAuthProvider();
+                    try {
+                        await signInWithPopup(auth, provider);
+                        showToast('Đã đăng nhập tài khoản Google!');
+                    } catch (err) {
+                        if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request')) {
+                            try {
+                                setCloudStatus('Đang chuyển hướng đăng nhập Google...');
+                                await signInWithRedirect(auth, provider);
+                                return;
+                            } catch (redirectErr) {
+                                console.warn('Lỗi chuyển hướng đăng nhập Google:', redirectErr);
+                            }
+                        }
+                        console.warn('Đăng nhập Google không khả dụng trên khung xem trước:', err?.code || err);
+                        setCloudStatus('Đang dùng phiên đồng bộ đám mây tự động');
+                        showToast('Trình duyệt chặn popup Google; đã bật đồng bộ đám mây tự động');
+                    }
+                });
+            }
+
+            if (cloudSyncNowBtn) {
+                cloudSyncNowBtn.addEventListener('click', async () => {
+                    if (!currentUser) {
+                        showToast('Chưa kết nối tài khoản đồng bộ');
+                        return;
+                    }
+                    await pushStateToCloud();
+                    showToast('Đã lưu dữ liệu lên đám mây');
+                });
+            }
+
+            if (cloudSignoutBtn) {
+                cloudSignoutBtn.addEventListener('click', async () => {
+                    try {
+                        await signOut(auth);
+                        await signInAnonymously(auth);
+                        showToast('Đã đăng xuất tài khoản Google');
+                    } catch (err) {
+                        console.error('Lỗi đăng xuất:', err);
+                    }
+                });
+            }
+        }
+
+        initFirebaseSync();
+    </script>
+</body>
+</html>
